@@ -11,7 +11,8 @@
  *
  * Key characteristics:
  * - User-Agent: reqwest default (no distinctive prefix) — use x-meridian-agent or env var
- * - No session header: relies on fingerprint-based session cache
+ * - Session key: x-session-affinity header (Forge's provider config supports only
+ *   static custom_headers, so deployments opt into keyed resume with a stable value)
  * - CWD in system prompt: <current_working_directory>/path</current_working_directory>
  * - Snake_case tools: read, write, patch, multi_patch, shell, fs_search, etc.
  * - Always streams (stream: true by default)
@@ -22,6 +23,8 @@
  * is unreliable. Use one of:
  * - x-meridian-agent: forgecode header (per-request)
  * - MERIDIAN_DEFAULT_AGENT=forgecode env var (global default)
+ *
+ * Keyed session resume additionally requires x-session-affinity on each request.
  */
 
 import type { Context } from "hono"
@@ -69,11 +72,16 @@ export const forgeCodeAdapter: AgentAdapter = {
   name: "forgecode",
 
   /**
-   * ForgeCode sends no session header.
-   * Session continuity is maintained via fingerprint-based cache lookup.
+   * Reads `x-session-affinity` when the deployment configures it.
+   *
+   * Without a session key every tool-result turn is classified as a
+   * client-driven loop and diverges before the fingerprint cache is ever
+   * consulted, so headerless deployments pay a full-replay turn for each tool
+   * round. Fingerprint continuity still applies to headerless turns that do
+   * not end in a tool result.
    */
-  getSessionId(_c: Context): string | undefined {
-    return undefined
+  getSessionId(c: Context): string | undefined {
+    return c.req.header("x-session-affinity")
   },
 
   extractWorkingDirectory(body: any): string | undefined {

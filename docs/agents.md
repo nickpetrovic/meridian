@@ -337,6 +337,14 @@ MERIDIAN_DEFAULT_AGENT=forgecode meridian
 
 ForgeCode uses reqwest's default User-Agent, so automatic detection isn't possible. The `MERIDIAN_DEFAULT_AGENT` env var tells Meridian to use the ForgeCode adapter for all unrecognized requests. If you run other agents alongside ForgeCode, use the `x-meridian-agent: forgecode` header instead (add `[providers.headers]` to your `.forge.toml`).
 
+Forge has no native session header, so keyed resume is opt-in per provider entry. Add a stable value to the same `[[providers]]` block:
+
+```toml
+custom_headers = { "x-session-affinity" = "forge-ws1" }
+```
+
+Each tool-result turn then resumes the session instead of replaying the full prompt (see [Session continuity](./configuration.md#client-driven-tool-loops-need-a-session-header)). An affinity header sent without `x-meridian-agent` resolves to the OpenCode adapter, which honors the same header — either way the session resumes.
+
 ### Pi
 
 Pi uses the `@mariozechner/pi-ai` library which supports a configurable `baseUrl` on the model. Add a provider-level override in `~/.pi/agent/models.json`:

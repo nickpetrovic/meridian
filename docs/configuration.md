@@ -272,9 +272,10 @@ rewrites the opening message.
 | `claudecode` | `metadata.user_id` `{"session_id": …}` |
 | `codex` | `x-codex-session` |
 | `crush` | `x-session-id`, then `x-session-affinity` |
+| `forgecode` | `x-session-affinity` |
 | `jcode` | `x-jcode-session` |
 | `passthrough` (LiteLLM) | `x-litellm-session-id` |
-| `cherry`, `droid`, `forgecode`, `openai` | none — fingerprint only |
+| `cherry`, `droid`, `openai` | none — fingerprint only |
 
 ### Claude Code behind a gateway
 
@@ -346,8 +347,8 @@ success metrics and shows up only as burn rate and a model that behaves as
 though it has amnesia.
 
 Send a session header and the loop resumes. If the client has no native
-header, `x-session-affinity` is honoured by the `opencode`, `pi`, `prime` and
-`crush` adapters.
+header, `x-session-affinity` is honoured by the `opencode`, `pi`, `prime`,
+`crush` and `forgecode` adapters.
 
 Pi has no native header, but it exposes a `before_provider_headers`
 extension hook. Save this as `~/.pi/agent/extensions/session-affinity.ts`:

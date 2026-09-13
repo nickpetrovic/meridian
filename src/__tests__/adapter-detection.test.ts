@@ -465,10 +465,15 @@ describe("detectAdapter — adapter contracts", () => {
     expect(adapter.extractWorkingDirectory(body)).toBe("/tmp/forge-project")
   })
 
-  it("detected forgecode adapter returns undefined for session ID", () => {
+  it("detected forgecode adapter reads x-session-affinity for keyed resume", () => {
+    // Forge deployments opt into keyed session resume with a static
+    // custom_headers entry; headerless tool-result turns still diverge.
     const adapter = detectAdapter(makeContext("", { "x-meridian-agent": "forgecode" }))
-    const ctx = { req: { header: () => "any-value" } }
-    expect(adapter.getSessionId(ctx as any)).toBeUndefined()
+    const ctx = (h: Record<string, string>) => ({ req: { header: (n: string) => h[n] } })
+    expect(adapter.getSessionId(ctx({ "x-session-affinity": "aff-1" }) as any)).toBe("aff-1")
+    expect(adapter.getSessionId(ctx({}) as any)).toBeUndefined()
+    // Not OpenCode's header.
+    expect(adapter.getSessionId(ctx({ "x-opencode-session": "sess-abc" }) as any)).toBeUndefined()
   })
 
   it("detected forgecode adapter has forgecode MCP server name", () => {

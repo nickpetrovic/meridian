@@ -2,9 +2,9 @@
  * ForgeCode Adapter Integration Tests
  *
  * Verifies that requests with x-meridian-agent: forgecode header use the
- * forgecode adapter: correct MCP server name, fingerprint-based session resume,
- * no session header tracking, streaming support, and backward compat with
- * OpenCode requests on the same proxy.
+ * forgecode adapter: correct MCP server name, x-session-affinity keyed resume,
+ * fingerprint resume for headerless requests, streaming support, and backward
+ * compat with OpenCode requests on the same proxy.
  */
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
@@ -231,6 +231,65 @@ describe("ForgeCode adapter: no session header", () => {
       "x-opencode-session": "should-be-ignored",
     })
     expect(res.status).toBe(200)
+  })
+})
+
+describe("ForgeCode adapter: x-session-affinity keyed resume", () => {
+  let savedPassthrough: string | undefined
+
+  beforeEach(() => {
+    mockMessages = [assistantMessage([{ type: "text", text: "Done" }])]
+    capturedQueryParams = null
+    clearSessionCache()
+    savedPassthrough = process.env.MERIDIAN_PASSTHROUGH
+    process.env.MERIDIAN_PASSTHROUGH = "0"
+  })
+
+  afterEach(() => {
+    if (savedPassthrough !== undefined) process.env.MERIDIAN_PASSTHROUGH = savedPassthrough
+    else delete process.env.MERIDIAN_PASSTHROUGH
+  })
+
+  const TOOL_RESULT_TURN = {
+    ...FORGECODE_BODY,
+    messages: [
+      ...FORGECODE_BODY.messages,
+      { role: "assistant", content: [{ type: "tool_use", id: "tu_1", name: "fs_search", input: { pattern: "proxy" } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "tu_1", content: "src/proxy/server.ts" }] },
+    ],
+  }
+
+  it("tool-result turn resumes when x-session-affinity matches", async () => {
+    const app = createTestApp()
+
+    await (await post(app, FORGECODE_BODY, { ...FORGECODE_HEADERS, "x-session-affinity": "forge-ws-1" })).json()
+
+    capturedQueryParams = null
+    await (await post(app, TOOL_RESULT_TURN, { ...FORGECODE_HEADERS, "x-session-affinity": "forge-ws-1" })).json()
+
+    expect(capturedQueryParams.options.resume).toBeDefined()
+  })
+
+  it("tool-result turn diverges without the header — the headerless guard fires before the fingerprint", async () => {
+    const app = createTestApp()
+
+    await (await post(app, FORGECODE_BODY, FORGECODE_HEADERS)).json()
+
+    capturedQueryParams = null
+    await (await post(app, TOOL_RESULT_TURN, FORGECODE_HEADERS)).json()
+
+    expect(capturedQueryParams.options.resume).toBeUndefined()
+  })
+
+  it("a different affinity value starts a separate session", async () => {
+    const app = createTestApp()
+
+    await (await post(app, FORGECODE_BODY, { ...FORGECODE_HEADERS, "x-session-affinity": "forge-ws-1" })).json()
+
+    capturedQueryParams = null
+    await (await post(app, TOOL_RESULT_TURN, { ...FORGECODE_HEADERS, "x-session-affinity": "forge-ws-2" })).json()
+
+    expect(capturedQueryParams.options.resume).toBeUndefined()
   })
 })
 

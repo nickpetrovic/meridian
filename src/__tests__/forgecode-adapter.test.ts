@@ -11,14 +11,24 @@ describe("forgeCodeAdapter — identity", () => {
 })
 
 describe("forgeCodeAdapter.getSessionId", () => {
-  it("always returns undefined — ForgeCode sends no session header", () => {
+  it("returns x-session-affinity when present", () => {
     const ctx = {
-      req: { header: () => "any-value" },
+      req: {
+        header: (name: string) =>
+          name === "x-session-affinity" ? "forge-ws-1" : undefined,
+      },
+    }
+    expect(forgeCodeAdapter.getSessionId(ctx as any)).toBe("forge-ws-1")
+  })
+
+  it("returns undefined without any session header", () => {
+    const ctx = {
+      req: { header: () => undefined },
     }
     expect(forgeCodeAdapter.getSessionId(ctx as any)).toBeUndefined()
   })
 
-  it("returns undefined even when x-opencode-session is present", () => {
+  it("ignores x-opencode-session — ForgeCode never sends it", () => {
     const ctx = {
       req: {
         header: (name: string) =>
